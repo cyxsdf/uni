@@ -156,3 +156,14 @@ class HumorDataset(Dataset):
             x_c = 0
             y = self.y[index]
         return x_c, x_p, y
+
+
+
+if __name__ == '__main__':
+    path = './data/UR-FUNNY/sdk_features/'
+    max_context_len = 8
+    max_sen_len = 40
+    train_data = HumorDataset('train', path, max_context_len, max_sen_len, online=True)
+    print(train_data.__getitem__(0)[0].shape)
+    print(train_data.__getitem__(0)[1].shape)
+    print(train_data.__getitem__(0)[2].shape)
