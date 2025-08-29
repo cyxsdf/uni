@@ -61,7 +61,7 @@ parser.add_argument('--log_interval', type=int, default=30,
                     help='frequency of result logging (default: 30)')
 parser.add_argument('--seed', type=int, default=1111,
                     help='random seed')
-parser.add_argument('--no_cuda', type=bool, default=False,
+parser.add_argument('--no_cuda', type=bool, default=True,
                     help='do not use cuda (default: false)')
 parser.add_argument('--distribute', action='store_true',
                     help='use distributed training (default: false)')
@@ -80,7 +80,7 @@ args = parser.parse_args()
 seed_everything(args)
 dataset = str.lower(args.dataset.strip())
 
-use_cuda = False
+use_cuda = True
 
 output_dim_dict = {
     'mosi': 1,
@@ -136,19 +136,19 @@ elif dataset == 'meld_emo':
     classes, meld_info, train_data, valid_data, test_data, mask_train_data, mask_valid_data, mask_test_data \
         = load_meld('emotion', os.path.join(args.data_path, 'MELD/'))
 elif dataset == 'urfunny':
-    path = './data/UR-FUNNY/'
+    path = './data/UR-FUNNY/sdk_features'
     max_context_len = 8
     max_sen_len = 40
     if not args.use_bert:
-        train_data = HumorDataset('train', path, max_context_len, max_sen_len, online=False)
-        valid_data = HumorDataset('dev', path, max_context_len, max_sen_len, online=False)
-        test_data = HumorDataset('test', path, max_context_len, max_sen_len, online=False)
+        train_data = HumorDataset('train', path, max_context_len, max_sen_len, online=True)
+        valid_data = HumorDataset('dev', path, max_context_len, max_sen_len, online=True)
+        test_data = HumorDataset('test', path, max_context_len, max_sen_len, online=True)
     else:
         args.weight_decay_bert = 0.001
         args.lr_bert = 5e-5
-        train_data = HumorBertDataset('train', path, max_context_len, max_sen_len, online=False)
-        valid_data = HumorBertDataset('dev', path, max_context_len, max_sen_len, online=False)
-        test_data = HumorBertDataset('test', path, max_context_len, max_sen_len, online=False)
+        train_data = HumorBertDataset('train', path, max_context_len, max_sen_len, online=True)
+        valid_data = HumorBertDataset('dev', path, max_context_len, max_sen_len, online=True)
+        test_data = HumorBertDataset('test', path, max_context_len, max_sen_len, online=True)
 elif dataset == 'mosi-bert' or dataset == 'mosei-bert' or dataset == 'sims':
     args.use_bert = True
     args.language = 'cn' if dataset == 'sims' else 'en'
