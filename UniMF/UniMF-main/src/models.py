@@ -501,3 +501,53 @@ class BertTextEncoder(nn.Module):
                                                 attention_mask=input_mask,
                                                 token_type_ids=segment_ids)[0]  # Models outputs are now tuples
         return last_hidden_states
+
+
+class DialogUNIMFModel(UNIMFModel):
+    def __init__(self, hyp_params):
+        super().__init__(hyp_params)
+        self.max_turns = hyp_params.max_turns
+        self.speaker_embedding = nn.Embedding(hyp_params.num_speakers, hyp_params.speaker_dim)
+        self.turn_transformer = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=hyp_params.embed_dim + hyp_params.speaker_dim,
+                nhead=hyp_params.num_heads,
+                dim_feedforward=hyp_params.embed_dim * 4,
+                dropout=hyp_params.res_dropout
+            ),
+            num_layers=hyp_params.dialog_layers
+        )
+        self.turn_proj = nn.Linear(hyp_params.embed_dim + hyp_params.speaker_dim, hyp_params.embed_dim)
+
+    def forward(self, x_l, x_a, x_v, speaker_ids, turn_mask):
+        """
+        x_l: [batch, turns, seq_len, text_dim]
+        speaker_ids: [batch, turns]
+        turn_mask: [batch, turns] (1表示有效轮次)
+        """
+        batch_size, turns, seq_len, _ = x_l.shape
+        all_turn_feats = []
+
+        # 处理每一轮的单轮特征（复用原UniMF的单轮处理逻辑）
+        for t in range(turns):
+            l_feat, a_feat, v_feat = x_l[:, t], x_a[:, t], x_v[:, t]
+            single_turn_out, _ = super().forward(l_feat, a_feat, v_feat)  # [batch, 1, embed_dim]
+            all_turn_feats.append(single_turn_out.squeeze(1))  # [batch, embed_dim]
+
+        # 拼接多轮特征 [turns, batch, embed_dim]
+        turn_feats = torch.stack(all_turn_feats, dim=0)
+
+        # 加入说话人嵌入
+        speaker_emb = self.speaker_embedding(speaker_ids).permute(1, 0, 2)  # [turns, batch, speaker_dim]
+        turn_feats = torch.cat([turn_feats, speaker_emb], dim=-1)  # [turns, batch, embed_dim+speaker_dim]
+
+        # 对话级Transformer（捕捉轮次依赖）
+        turn_mask = (turn_mask == 0).unsqueeze(0).unsqueeze(0)  # [1,1,batch,turns]
+        turn_feats = self.turn_transformer(turn_feats, src_mask=turn_mask)
+
+        # 投影回原维度
+        turn_feats = self.turn_proj(turn_feats).permute(1, 0, 2)  # [batch, turns, embed_dim]
+
+        # 预测每轮情感
+        output = self.out_layer(turn_feats)  # [batch, turns, output_dim]
+        return output
