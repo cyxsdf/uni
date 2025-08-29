@@ -23,7 +23,7 @@ parser.add_argument('--model', type=str, default='UniMF',
 # Tasks
 parser.add_argument('--aligned', type=bool, default=True,
                     help='consider aligned experiment or not (default: True)')
-parser.add_argument('--dataset', type=str, default='mosi', choices=['mosi', 'mosei_senti', 'urfunny', 'mosi-bert', 'mosei-bert', 'meld_senti', 'meld_emo'],
+parser.add_argument('--dataset', type=str, default='mosei_senti', choices=['mosi', 'mosei_senti', 'urfunny', 'mosi-bert', 'mosei-bert', 'meld_senti', 'meld_emo'],
                     help='dataset to use (default: mosi)')
 parser.add_argument('--data_path', type=str, default='data',
                     help='path for storing the dataset')
@@ -160,9 +160,9 @@ elif dataset == 'mosi-bert' or dataset == 'mosei-bert' or dataset == 'sims':
 else:
     raise ValueError('Unknown dataset')
 
-train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, generator=torch.Generator(device='cuda'))
-valid_loader = DataLoader(valid_data, batch_size=args.batch_size, shuffle=True, generator=torch.Generator(device='cuda'))
-test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True, generator=torch.Generator(device='cuda'))
+train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, generator=torch.Generator(device='cpu'))
+valid_loader = DataLoader(valid_data, batch_size=args.batch_size, shuffle=True, generator=torch.Generator(device='cpu'))
+test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True, generator=torch.Generator(device='cpu'))
 
 print('Finish loading the data....')
 print(f'### Dataset - {str.upper(dataset)}')
@@ -237,10 +237,10 @@ if __name__ == '__main__':
         if dataset != 'meld_senti' and dataset != 'meld_emo' and hyp_params.modalities != 'LAV' or \
                 'meld' in dataset and hyp_params.modalities != 'LA':
             hyp_params.trans_layers = trial.suggest_int('trans_layers', 1, 8, step=1)
-            hyp_params.trans_dropout = trial.suggest_uniform('trans_dropout', 0.0, 0.5)
-        hyp_params.attn_dropout = trial.suggest_uniform('attn_dropout', 0.0, 0.5)
-        hyp_params.embed_dropout = trial.suggest_uniform('embed_dropout', 0.0, 0.5)
-        hyp_params.out_dropout = trial.suggest_uniform('out_dropout', 0.0, 0.5)
+            hyp_params.trans_dropout = trial.suggest_float('trans_dropout', 0.0, 0.5)
+        hyp_params.attn_dropout = trial.suggest_float('attn_dropout', 0.0, 0.5)
+        hyp_params.embed_dropout = trial.suggest_float('embed_dropout', 0.0, 0.5)
+        hyp_params.out_dropout = trial.suggest_float('out_dropout', 0.0, 0.5)
         hyp_params.l_kernel_size = trial.suggest_int('l_kernel_size', 1, 5, step=2)
         if dataset != 'meld_senti' and dataset != 'meld_emo':
             hyp_params.v_kernel_size = trial.suggest_int('v_kernel_size', 1, 5, step=2)
