@@ -1,3 +1,4 @@
+
 import torch
 from torch import nn
 import sys
@@ -19,7 +20,7 @@ from src.eval_metrics import *
 #
 ####################################################################
 
-text_dim, audio_dim, video_dim = 300, 40, 371
+text_dim, audio_dim, video_dim = 300, 81, 371
 
 
 def crop(a): return a[:, :, :, 0:text_dim], a[:, :, :, text_dim:(text_dim + audio_dim)], a[:, :, :,
