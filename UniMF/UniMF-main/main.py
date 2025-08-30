@@ -43,7 +43,7 @@ parser.add_argument('--num_heads', type=int, default=8,
                     help='number of heads for the transformer network (default: 8)')
 
 # Tuning
-parser.add_argument('--batch_size', type=int, default=128, metavar='N',
+parser.add_argument('--batch_size', type=int, default=64, metavar='N',
                     help='batch size (default: 128)')
 parser.add_argument('--clip', type=float, default=0.8,
                     help='gradient clip value (default: 0.8)')
