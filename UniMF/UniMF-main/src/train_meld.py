@@ -31,9 +31,11 @@ def initiate(hyp_params, train_loader, valid_loader, test_loader):
     if hyp_params.modalities != 'LA':
         if hyp_params.modalities == 'L':
             translator = getattr(models, 'TRANSLATEModel')(hyp_params, 'A')
+            translator = translator.cuda()
             translator_optimizer = getattr(optim, hyp_params.optim)(translator.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'A':
             translator = getattr(models, 'TRANSLATEModel')(hyp_params, 'L')
+            translator = translator.cuda()
             translator_optimizer = getattr(optim, hyp_params.optim)(translator.parameters(), lr=hyp_params.lr)
         trans_criterion = getattr(nn, 'MSELoss')()
     model = getattr(models, hyp_params.model + 'Model')(hyp_params)
