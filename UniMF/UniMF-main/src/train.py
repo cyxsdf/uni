@@ -32,30 +32,52 @@ def initiate(hyp_params, train_loader, valid_loader, test_loader):
         if hyp_params.modalities == 'L':
             translator1 = getattr(models, 'TRANSLATEModel')(hyp_params, 'A')
             translator2 = getattr(models, 'TRANSLATEModel')(hyp_params, 'V')
+            # 添加设备移动
+            if hyp_params.use_cuda:
+                translator1 = translator1.cuda()
+                translator2 = translator2.cuda()
             translator1_optimizer = getattr(optim, hyp_params.optim)(translator1.parameters(), lr=hyp_params.lr)
             translator2_optimizer = getattr(optim, hyp_params.optim)(translator2.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'A':
             translator1 = getattr(models, 'TRANSLATEModel')(hyp_params, 'L')
             translator2 = getattr(models, 'TRANSLATEModel')(hyp_params, 'V')
+            # 添加设备移动
+            if hyp_params.use_cuda:
+                translator1 = translator1.cuda()
+                translator2 = translator2.cuda()
             translator1_optimizer = getattr(optim, hyp_params.optim)(translator1.parameters(), lr=hyp_params.lr)
             translator2_optimizer = getattr(optim, hyp_params.optim)(translator2.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'V':
             translator1 = getattr(models, 'TRANSLATEModel')(hyp_params, 'L')
             translator2 = getattr(models, 'TRANSLATEModel')(hyp_params, 'A')
+            # 添加设备移动
+            if hyp_params.use_cuda:
+                translator1 = translator1.cuda()
+                translator2 = translator2.cuda()
             translator1_optimizer = getattr(optim, hyp_params.optim)(translator1.parameters(), lr=hyp_params.lr)
             translator2_optimizer = getattr(optim, hyp_params.optim)(translator2.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'LA':
             translator = getattr(models, 'TRANSLATEModel')(hyp_params, 'V')
+            # 添加设备移动
+            if hyp_params.use_cuda:
+                translator = translator.cuda()
             translator_optimizer = getattr(optim, hyp_params.optim)(translator.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'LV':
             translator = getattr(models, 'TRANSLATEModel')(hyp_params, 'A')
+            # 添加设备移动
+            if hyp_params.use_cuda:
+                translator = translator.cuda()
             translator_optimizer = getattr(optim, hyp_params.optim)(translator.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'AV':
             translator = getattr(models, 'TRANSLATEModel')(hyp_params, 'L')
+            # 添加设备移动
+            if hyp_params.use_cuda:
+                translator = translator.cuda()
             translator_optimizer = getattr(optim, hyp_params.optim)(translator.parameters(), lr=hyp_params.lr)
         else:
             raise ValueError('Unknown modalities type')
         trans_criterion = getattr(nn, 'MSELoss')()
+    # 其余代码保持不变...
     model = getattr(models, hyp_params.model + 'Model')(hyp_params)
 
     if hyp_params.use_cuda:
