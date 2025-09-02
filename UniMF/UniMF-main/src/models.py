@@ -48,7 +48,7 @@ class TRANSLATEModel(nn.Module):
                                              relu_dropout=self.relu_dropout,
                                              res_dropout=self.res_dropout)
 
-        # project module  # just use fc to replace conv1d :-)
+        # project module
         if 'L' in self.modalities or self.missing == 'L':
             self.proj_l = nn.Linear(self.orig_d_l, self.embed_dim)
         if 'A' in self.modalities or self.missing == 'A':
@@ -140,14 +140,13 @@ class TRANSLATEModel(nn.Module):
             x_l = x_l.transpose(0, 1)
         else:
             raise ValueError('Unknown modalities type')
-        #################################################################################
+
         # For modal type embedding
         L_MODAL_TYPE_IDX = 0
         A_MODAL_TYPE_IDX = 1
         V_MODAL_TYPE_IDX = 2
 
         # Prepare the [Uni] token or [Bi] token
-        # NOTE: [Uni] or [Bi] is in front of the missing modality
         batch_size = tgt.shape[0]
         multi = self.multi.unsqueeze(1).repeat(1, batch_size, 1)
 
@@ -156,14 +155,14 @@ class TRANSLATEModel(nn.Module):
                 x_l = torch.cat((multi, x_l[:-1]), dim=0)
             elif self.missing == 'A':
                 x_a = torch.cat((multi, x_a[:-1]), dim=0)
-            elif self.missing == 'V':  # self.missing == 'V'
+            elif self.missing == 'V':
                 x_v = torch.cat((multi, x_v[:-1]), dim=0)
             else:
                 raise ValueError('Unknown missing modality type')
         else:
             if eval_start:
                 if self.missing == 'L':
-                    x_l = multi  # use [Uni] or [Bi] token as start to generate missing modality
+                    x_l = multi
                 elif self.missing == 'A':
                     x_a = multi
                 elif self.missing == 'V':
@@ -202,7 +201,7 @@ class TRANSLATEModel(nn.Module):
             v_embeds = v_pos_embeds + v_modal_type_embeds
             x_v = x_v + v_embeds
             x_v = F.dropout(x_v, p=self.embed_dropout, training=self.training)
-        #################################################################################
+
         # Translation
         if self.modalities == 'L':
             if self.missing == 'A':
@@ -299,19 +298,38 @@ class UNIMFModel(nn.Module):
         if self.dataset != 'meld_senti' and self.dataset != 'meld_emo':
             self.v_len = self.orig_v_len - self.v_kernel_size + 1
 
-        output_dim = hyp_params.output_dim  # This is actually not a hyperparameter :-)
+        output_dim = hyp_params.output_dim
 
         # Prepare BERT model if use bert
         if self.use_bert:
             self.text_model = BertTextEncoder(language=hyp_params.language, use_finetune=True)
 
-        # 1. Temporal convolutional blocks
+        # 1. Temporal convolutional blocks with residual connections
+        # Text residual block - 使用相同卷积核确保维度匹配
         self.proj_l = nn.Conv1d(self.orig_d_l, self.embed_dim, kernel_size=self.l_kernel_size)
+        self.residual_l = nn.Conv1d(self.orig_d_l, self.embed_dim, kernel_size=self.l_kernel_size)
+        self.bn_l = nn.BatchNorm1d(self.embed_dim)
+        self.relu_l = nn.ReLU()
+
+        # Audio residual block - 使用相同卷积核确保维度匹配
         self.proj_a = nn.Conv1d(self.orig_d_a, self.embed_dim, kernel_size=self.a_kernel_size)
+        self.residual_a = nn.Conv1d(self.orig_d_a, self.embed_dim, kernel_size=self.a_kernel_size)
+        self.bn_a = nn.BatchNorm1d(self.embed_dim)
+        self.relu_a = nn.ReLU()
+
+        # Vision residual block (if not meld dataset)
         if self.dataset != 'meld_senti' and self.dataset != 'meld_emo':
             self.proj_v = nn.Conv1d(self.orig_d_v, self.embed_dim, kernel_size=self.v_kernel_size)
+            self.residual_v = nn.Conv1d(self.orig_d_v, self.embed_dim, kernel_size=self.v_kernel_size)
+            self.bn_v = nn.BatchNorm1d(self.embed_dim)
+            self.relu_v = nn.ReLU()
+
         if 'meld' in self.dataset:
             self.proj_cls = nn.Conv1d(self.orig_d_l + self.orig_d_a, self.embed_dim, kernel_size=1)
+            # MELD cls residual block
+            self.residual_cls = nn.Conv1d(self.orig_d_l + self.orig_d_a, self.embed_dim, kernel_size=1)
+            self.bn_cls = nn.BatchNorm1d(self.embed_dim)
+            self.relu_cls = nn.ReLU()
 
         # 2. GRU encoder
         self.t = nn.GRU(input_size=self.embed_dim, hidden_size=self.embed_dim)
@@ -352,7 +370,7 @@ class UNIMFModel(nn.Module):
             self.a.flatten_parameters()
             if x_v is not None:
                 self.v.flatten_parameters()
-        #################################################################################
+
         # For modal type embedding
         L_MODAL_TYPE_IDX = 0
         A_MODAL_TYPE_IDX = 1
@@ -364,10 +382,13 @@ class UNIMFModel(nn.Module):
         if self.dataset != 'meld_senti' and self.dataset != 'meld_emo':
             cls = self.cls.unsqueeze(1).repeat(1, batch_size, 1)
         else:
-            cls = self.proj_cls(torch.cat((x_l, x_a), dim=-1).transpose(1, 2)).permute(2, 0, 1)
+            # MELD dataset uses combined cls with residual connection
+            combined_cls_input = torch.cat((x_l, x_a), dim=-1).transpose(1, 2)
+            cls_conv = self.proj_cls(combined_cls_input)
+            cls_residual = self.residual_cls(combined_cls_input)
+            cls = self.relu_cls(self.bn_cls(cls_conv + cls_residual)).permute(2, 0, 1)
 
         # Prepare the positional embeddings & modal-type embeddings
-        # NOTE: [CLS] is at the ZERO index
         cls_pos_ids = torch.arange(self.cls_len, device=x_l.device).unsqueeze(1).expand(-1, batch_size)
         h_l_pos_ids = torch.arange(self.l_len, device=x_l.device).unsqueeze(1).expand(-1, batch_size)
         h_a_pos_ids = torch.arange(self.a_len, device=x_a.device).unsqueeze(1).expand(-1, batch_size)
@@ -385,8 +406,8 @@ class UNIMFModel(nn.Module):
         a_modal_type_embeds = self.modal_type_embeddings(torch.full_like(h_a_pos_ids, A_MODAL_TYPE_IDX))
         if x_v is not None:
             v_modal_type_embeds = self.modal_type_embeddings(torch.full_like(h_v_pos_ids, V_MODAL_TYPE_IDX))
-        #################################################################################
-        # Project the textual/visual/audio features & Compress the sequence length
+
+        # Project the textual/visual/audio features & Compress the sequence length with residual connections
         if self.use_bert:
             x_l = self.text_model(x_l)
 
@@ -395,21 +416,31 @@ class UNIMFModel(nn.Module):
         if x_v is not None:
             x_v = x_v.transpose(1, 2)
 
+        # Text residual block - 现在使用相同卷积核，维度匹配
         proj_x_l = self.proj_l(x_l)
+        residual_x_l = self.residual_l(x_l)
+        proj_x_l = self.relu_l(self.bn_l(proj_x_l + residual_x_l))
+        proj_x_l = proj_x_l.permute(2, 0, 1)
+
+        # Audio residual block - 现在使用相同卷积核，维度匹配
         proj_x_a = self.proj_a(x_a)
+        residual_x_a = self.residual_a(x_a)
+        proj_x_a = self.relu_a(self.bn_a(proj_x_a + residual_x_a))
+        proj_x_a = proj_x_a.permute(2, 0, 1)
+
+        # Vision residual block (if applicable)
         if x_v is not None:
             proj_x_v = self.proj_v(x_v)
-        proj_x_l = proj_x_l.permute(2, 0, 1)
-        proj_x_a = proj_x_a.permute(2, 0, 1)
-        if x_v is not None:
+            residual_x_v = self.residual_v(x_v)
+            proj_x_v = self.relu_v(self.bn_v(proj_x_v + residual_x_v))
             proj_x_v = proj_x_v.permute(2, 0, 1)
-        #################################################################################
+
         # Use GRU to encode
         h_l, _ = self.t(proj_x_l)
         h_a, _ = self.a(proj_x_a)
         if x_v is not None:
             h_v, _ = self.v(proj_x_v)
-        #################################################################################
+
         # Add positional & modal-type embeddings
         cls_embeds = cls_pos_embeds + cls_modal_type_embeds
         l_embeds = h_l_pos_embeds + l_modal_type_embeds
@@ -425,9 +456,8 @@ class UNIMFModel(nn.Module):
         h_a = F.dropout(h_a, p=self.embed_dropout, training=self.training)
         if x_v is not None:
             h_v = F.dropout(h_v, p=self.embed_dropout, training=self.training)
-        #################################################################################
+
         # Multimodal fusion
-        # Get total sequence and feed into UniMF
         if x_v is not None:
             x = torch.cat((cls, h_l, h_a, h_v), dim=0)
         else:
@@ -435,14 +465,13 @@ class UNIMFModel(nn.Module):
         x = self.unimf(x)
 
         if x_v is not None:
-            # A residual block
             last_hs = x[0]  # get [CLS] token for prediction
         else:
             last_hs = x[:self.cls_len]  # get [CLS] tokens for prediction
 
         last_hs_proj = self.proj2(
             F.dropout(F.relu(self.proj1(last_hs)), p=self.out_dropout, training=self.training))
-        last_hs_proj += last_hs
+        last_hs_proj += last_hs  # Final residual connection
 
         output = self.out_layer(last_hs_proj)
         if x_v is None:
@@ -486,20 +515,17 @@ class BertTextEncoder(nn.Module):
         """
         text: (batch_size, 3, seq_len)
         3: input_ids, input_mask, segment_ids
-        input_ids: input_ids,
-        input_mask: attention_mask,
-        segment_ids: token_type_ids
         """
         input_ids, input_mask, segment_ids = text[:, 0, :].long(), text[:, 1, :].float(), text[:, 2, :].long()
         if self.use_finetune:
             last_hidden_states = self.model(input_ids=input_ids,
                                             attention_mask=input_mask,
-                                            token_type_ids=segment_ids)[0]  # Models outputs are now tuples
+                                            token_type_ids=segment_ids)[0]
         else:
             with torch.no_grad():
                 last_hidden_states = self.model(input_ids=input_ids,
                                                 attention_mask=input_mask,
-                                                token_type_ids=segment_ids)[0]  # Models outputs are now tuples
+                                                token_type_ids=segment_ids)[0]
         return last_hidden_states
 
 
@@ -528,7 +554,7 @@ class DialogUNIMFModel(UNIMFModel):
         batch_size, turns, seq_len, _ = x_l.shape
         all_turn_feats = []
 
-        # 处理每一轮的单轮特征（复用原UniMF的单轮处理逻辑）
+        # 处理每一轮的单轮特征
         for t in range(turns):
             l_feat, a_feat, v_feat = x_l[:, t], x_a[:, t], x_v[:, t]
             single_turn_out, _ = super().forward(l_feat, a_feat, v_feat)  # [batch, 1, embed_dim]
