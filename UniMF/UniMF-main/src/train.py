@@ -30,8 +30,10 @@ from src.eval_metrics import *
 def initiate(hyp_params, train_loader, valid_loader, test_loader):
     if hyp_params.modalities != 'LAV':
         if hyp_params.modalities == 'L':
-            translator1 = getattr(models, 'TRANSLATEModel')(hyp_params, 'A')
-            translator2 = getattr(models, 'TRANSLATEModel')(hyp_params, 'V')
+            hyp_params.missing = 'A'  # 设置缺失模态
+            translator1 = getattr(models, 'TRANSLATEModel')(hyp_params)
+            hyp_params.missing = 'V'  # 设置缺失模态
+            translator2 = getattr(models, 'TRANSLATEModel')(hyp_params)
             # 添加设备移动
             if hyp_params.use_cuda:
                 translator1 = translator1.cuda()
@@ -39,8 +41,12 @@ def initiate(hyp_params, train_loader, valid_loader, test_loader):
             translator1_optimizer = getattr(optim, hyp_params.optim)(translator1.parameters(), lr=hyp_params.lr)
             translator2_optimizer = getattr(optim, hyp_params.optim)(translator2.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'A':
-            translator1 = getattr(models, 'TRANSLATEModel')(hyp_params, 'L')
-            translator2 = getattr(models, 'TRANSLATEModel')(hyp_params, 'V')
+            hyp_params.missing = 'L'
+            # 然后只传递hyp_params一个参数
+            translator1 = getattr(models, 'TRANSLATEModel')(hyp_params)
+            hyp_params.missing = 'V'
+            # 然后只传递hyp_params一个参数
+            translator2 = getattr(models, 'TRANSLATEModel')(hyp_params)
             # 添加设备移动
             if hyp_params.use_cuda:
                 translator1 = translator1.cuda()
@@ -48,8 +54,12 @@ def initiate(hyp_params, train_loader, valid_loader, test_loader):
             translator1_optimizer = getattr(optim, hyp_params.optim)(translator1.parameters(), lr=hyp_params.lr)
             translator2_optimizer = getattr(optim, hyp_params.optim)(translator2.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'V':
-            translator1 = getattr(models, 'TRANSLATEModel')(hyp_params, 'L')
-            translator2 = getattr(models, 'TRANSLATEModel')(hyp_params, 'A')
+            hyp_params.missing = 'L'
+            # 然后只传递hyp_params一个参数
+            translator1 = getattr(models, 'TRANSLATEModel')(hyp_params)
+            hyp_params.missing = 'V'
+            # 然后只传递hyp_params一个参数
+            translator2 = getattr(models, 'TRANSLATEModel')(hyp_params)
             # 添加设备移动
             if hyp_params.use_cuda:
                 translator1 = translator1.cuda()
@@ -57,19 +67,25 @@ def initiate(hyp_params, train_loader, valid_loader, test_loader):
             translator1_optimizer = getattr(optim, hyp_params.optim)(translator1.parameters(), lr=hyp_params.lr)
             translator2_optimizer = getattr(optim, hyp_params.optim)(translator2.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'LA':
-            translator = getattr(models, 'TRANSLATEModel')(hyp_params, 'V')
+            hyp_params.missing = 'L'
+            # 然后只传递hyp_params一个参数
+            translator = getattr(models, 'TRANSLATEModel')(hyp_params)
             # 添加设备移动
             if hyp_params.use_cuda:
                 translator = translator.cuda()
             translator_optimizer = getattr(optim, hyp_params.optim)(translator.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'LV':
-            translator = getattr(models, 'TRANSLATEModel')(hyp_params, 'A')
+            hyp_params.missing = 'L'
+            # 然后只传递hyp_params一个参数
+            translator = getattr(models, 'TRANSLATEModel')(hyp_params)
             # 添加设备移动
             if hyp_params.use_cuda:
                 translator = translator.cuda()
             translator_optimizer = getattr(optim, hyp_params.optim)(translator.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'AV':
-            translator = getattr(models, 'TRANSLATEModel')(hyp_params, 'L')
+            hyp_params.missing = 'L'
+            # 然后只传递hyp_params一个参数
+            translator = getattr(models, 'TRANSLATEModel')(hyp_params)
             # 添加设备移动
             if hyp_params.use_cuda:
                 translator = translator.cuda()
