@@ -1,3 +1,4 @@
+
 # import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = '0'  # Select GPU when not use distribute
 import csv
@@ -19,11 +20,15 @@ parser.add_argument('-f', default='', type=str)
 # Fixed
 parser.add_argument('--model', type=str, default='UniMF',
                     help='name of the model to use (Transformer, etc.)')
-
+# 在main.py中的参数解析部分
+parser.add_argument('--memory_size', type=int, default=1024,
+                    help='动态记忆池的大小')
+parser.add_argument('--top_k', type=int, default=8,
+                    help='动态记忆池检索时的top-k数量')
 # Tasks
 parser.add_argument('--aligned', type=bool, default=True,
                     help='consider aligned experiment or not (default: True)')
-parser.add_argument('--dataset', type=str, default='mosei_senti', choices=['mosi', 'mosei_senti', 'urfunny', 'mosi-bert', 'mosei-bert', 'meld_senti', 'meld_emo'],
+parser.add_argument('--dataset', type=str, default='meld_senti', choices=['mosi', 'mosei_senti', 'urfunny', 'mosi-bert', 'mosei-bert', 'meld_senti', 'meld_emo'],
                     help='dataset to use (default: mosi)')
 parser.add_argument('--data_path', type=str, default='data',
                     help='path for storing the dataset')
@@ -31,7 +36,6 @@ parser.add_argument('--run_id', type=int, default=1,
                     help='experiment id (default: 1)')
 parser.add_argument('--trials', type=int, default=10,
                     help='number of trials (default: 10)')
-
 # Dropouts
 parser.add_argument('--relu_dropout', type=float, default=0.1,
                     help='relu dropout')
@@ -72,7 +76,7 @@ parser.add_argument('--language', type=str, default='en',
                     help='bert language (default: en)')
 
 # Input modality settings
-parser.add_argument('--modalities', type=str, default='LAV', choices=['LAV', 'LA', 'LV', 'AV', 'L', 'A', 'V'],
+parser.add_argument('--modalities', type=str, default='L', choices=['LAV', 'LA', 'LV', 'AV', 'L', 'A', 'V'],
                     help='input modalities (default: LAV)')
 
 args = parser.parse_args()
@@ -136,7 +140,7 @@ elif dataset == 'meld_emo':
     classes, meld_info, train_data, valid_data, test_data, mask_train_data, mask_valid_data, mask_test_data \
         = load_meld('emotion', os.path.join(args.data_path, 'MELD/'))
 elif dataset == 'urfunny':
-    path = './data/UR-FUNNY/sdk_features'
+    path = './data/UR-FUNNY/sdk_features/'
     max_context_len = 8
     max_sen_len = 40
     if not args.use_bert:
