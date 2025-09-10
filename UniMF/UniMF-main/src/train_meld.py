@@ -30,11 +30,16 @@ from src.eval_metrics import *
 def initiate(hyp_params, train_loader, valid_loader, test_loader):
     if hyp_params.modalities != 'LA':
         if hyp_params.modalities == 'L':
-            translator = getattr(models, 'TRANSLATEModel')(hyp_params, 'A')
+            hyp_params.missing = 'A'
+            # 然后只传递hyp_params一个参数
+            translator = getattr(models, 'TRANSLATEModel')(hyp_params)
             translator = translator.cuda()
             translator_optimizer = getattr(optim, hyp_params.optim)(translator.parameters(), lr=hyp_params.lr)
         elif hyp_params.modalities == 'A':
-            translator = getattr(models, 'TRANSLATEModel')(hyp_params, 'L')
+            hyp_params.missing = 'L'
+            # 然后只传递hyp_params一个参数
+            translator = getattr(models, 'TRANSLATEModel')(hyp_params)
+
             translator = translator.cuda()
             translator_optimizer = getattr(optim, hyp_params.optim)(translator.parameters(), lr=hyp_params.lr)
         trans_criterion = getattr(nn, 'MSELoss')()
