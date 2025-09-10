@@ -124,9 +124,12 @@ class MultiheadAttention(nn.Module):
         #################################################################################
         # Masked Multi-Head Self-Attention
         mask = torch.zeros_like(attn_weights)
+        # 文本模态单独输入的情况
         if self.modalities == 'L':
             mask[:, :self.l_len, self.l_len + 1:] = float('-inf')
             mask[:, self.l_len + 1:, :self.l_len] = float('-inf')
+
+            # 处理可能的缺失模态类型
             if self.missing == 'A':
                 a_len = src_len - self.l_len
                 a_mask = self.generate_square_subsequent_mask(a_len)
@@ -135,11 +138,16 @@ class MultiheadAttention(nn.Module):
                 v_len = src_len - self.l_len
                 v_mask = self.generate_square_subsequent_mask(v_len)
                 mask[:, self.l_len:, self.l_len:] = v_mask
+            elif self.missing is None:  # 无缺失模态的情况
+                pass
             else:
-                raise ValueError('Unknown missing modality type')
+                raise ValueError(f'Unknown missing modality type: {self.missing} for modalities {self.modalities}')
+
+        # 音频模态单独输入的情况
         elif self.modalities == 'A':
             mask[:, :self.a_len, self.a_len + 1:] = float('-inf')
             mask[:, self.a_len + 1:, :self.a_len] = float('-inf')
+
             if self.missing == 'L':
                 l_len = src_len - self.a_len
                 l_mask = self.generate_square_subsequent_mask(l_len)
@@ -148,11 +156,16 @@ class MultiheadAttention(nn.Module):
                 v_len = src_len - self.a_len
                 v_mask = self.generate_square_subsequent_mask(v_len)
                 mask[:, self.a_len:, self.a_len:] = v_mask
+            elif self.missing is None:  # 无缺失模态的情况
+                pass
             else:
-                raise ValueError('Unknown missing modality type')
+                raise ValueError(f'Unknown missing modality type: {self.missing} for modalities {self.modalities}')
+
+        # 视觉模态单独输入的情况
         elif self.modalities == 'V':
             mask[:, :self.v_len, self.v_len + 1:] = float('-inf')
             mask[:, self.v_len + 1:, :self.v_len] = float('-inf')
+
             if self.missing == 'L':
                 l_len = src_len - self.v_len
                 l_mask = self.generate_square_subsequent_mask(l_len)
@@ -161,8 +174,12 @@ class MultiheadAttention(nn.Module):
                 a_len = src_len - self.v_len
                 a_mask = self.generate_square_subsequent_mask(a_len)
                 mask[:, self.v_len:, self.v_len:] = a_mask
+            elif self.missing is None:  # 无缺失模态的情况
+                pass
             else:
-                raise ValueError('Unknown missing modality type')
+                raise ValueError(f'Unknown missing modality type: {self.missing} for modalities {self.modalities}')
+
+        # 文本+音频模态输入的情况
         elif self.modalities == 'LA':
             v_len = src_len - self.l_len - self.a_len
             mask[:, :self.l_len, self.l_len:self.l_len + self.a_len] = float('-inf')
@@ -171,6 +188,8 @@ class MultiheadAttention(nn.Module):
             mask[:, self.l_len + self.a_len + 1:, :self.l_len + self.a_len] = float('-inf')
             v_mask = self.generate_square_subsequent_mask(v_len)
             mask[:, self.l_len + self.a_len:, self.l_len + self.a_len:] = v_mask
+
+        # 文本+视觉模态输入的情况
         elif self.modalities == 'LV':
             a_len = src_len - self.l_len - self.v_len
             mask[:, :self.l_len, self.l_len:self.l_len + self.v_len] = float('-inf')
@@ -179,6 +198,8 @@ class MultiheadAttention(nn.Module):
             mask[:, self.l_len + self.v_len + 1:, :self.l_len + self.v_len] = float('-inf')
             a_mask = self.generate_square_subsequent_mask(a_len)
             mask[:, self.l_len + self.v_len:, self.l_len + self.v_len:] = a_mask
+
+        # 音频+视觉模态输入的情况
         elif self.modalities == 'AV':
             l_len = src_len - self.a_len - self.v_len
             mask[:, :self.a_len, self.a_len:self.a_len + self.v_len] = float('-inf')
@@ -187,13 +208,18 @@ class MultiheadAttention(nn.Module):
             mask[:, self.a_len + self.v_len + 1:, :self.a_len + self.v_len] = float('-inf')
             l_mask = self.generate_square_subsequent_mask(l_len)
             mask[:, self.a_len + self.v_len:, self.a_len + self.v_len:] = l_mask
+
+        # 所有模态都存在的情况
+        elif self.modalities == 'LAV':
+            # 可以根据需要添加全模态情况下的掩码逻辑
+            pass
+
         else:
-            raise ValueError('Unknown modalities type')
+            raise ValueError(f'Unknown modalities type: {self.modalities}')
+
         attn_weights = attn_weights + mask
         #################################################################################
         attn_weights = F.softmax(attn_weights.float(), dim=-1).type_as(attn_weights)
-        # attn_weights = F.relu(attn_weights)
-        # attn_weights = attn_weights / torch.max(attn_weights)
         attn_weights = F.dropout(attn_weights, p=self.attn_dropout, training=self.training)
 
         attn = torch.bmm(attn_weights, v)
