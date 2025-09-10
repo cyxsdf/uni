@@ -292,8 +292,7 @@ def train_model(settings, hyp_params, train_loader, valid_loader, test_loader):
 
         # print("-"*50)
         # print('Epoch {:2d} | Time {:5.4f} sec | Valid Loss {:5.4f}'.format(epoch, duration, val_loss))
-        # print("-"*50)
-
+        # print("-"*50
         if val_loss < best_valid:
             if hyp_params.modalities == 'L' or hyp_params.modalities == 'A':
                 save_model(hyp_params, translator, name='TRANSLATOR')
